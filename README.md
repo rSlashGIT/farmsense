@@ -1,165 +1,278 @@
-# 🌿 FarmSense AI — Intelligent Crop Recommendation System
+# FarmSense AI
 
-> **AI-powered crop advisory for Indian farmers.** Enter your soil parameters and location, and get the top 3 crop recommendations ranked by soil suitability, market demand, and profitability — all powered by a trained Random Forest ML model.
+**FarmSense AI** is a full-stack crop recommendation and farm decision-support project for Indian agriculture. It combines a Random Forest classifier, live weather, soil-report extraction, market scoring, optional live mandi prices, profitability estimates, and a React dashboard.
 
----
+This repository is the **complete project handoff** for students who want to run, understand, extend, or use the project as the implementation base for academic work.
 
-## 🌾 Features
-
-- **ML-Powered Predictions** — Random Forest Classifier trained on 2,200 soil samples across 22 crop types
-- **Live Weather Integration** — Auto-fills temperature, humidity, and rainfall from Open-Meteo (no API key needed)
-- **Market Scoring** — Static market scores for all 22 crops based on MSP, demand, and export potential
-- **Dynamic Reasoning** — Human-readable explanation for every recommendation based on actual soil values
-- **Animated Gauge Charts** — Real SVG circular gauges for Soil Fit, Market Score, and Profit Index
-- **Drag-and-Drop Upload** — UI for soil report uploads (AI extraction roadmap)
-- **Dark-theme UI** — Professional dark green design with Syne + Space Mono fonts
+> Start with [HANDOFF.md](./HANDOFF.md) if you are taking over this project.
 
 ---
 
-## 📁 Project Structure
+## Current Project Snapshot
 
+| Item | Current implementation |
+|---|---|
+| Frontend | React 18 + Vite 5 + Tailwind CSS 3 |
+| Backend | Python 3.11 + FastAPI |
+| ML model | scikit-learn RandomForestClassifier |
+| Crop classes | **56** |
+| ML dataset | **5,600 rows** (100 generated samples per crop) |
+| Direct ML input features | **7**: N, P, K, temperature, humidity, pH, rainfall |
+| Recommendation output | Top **5** crops |
+| Mandi archive | **7,000 monthly rows**, Jan 2016-May 2026 |
+| Weather | Open-Meteo + MET Norway fallback |
+| Soil report extraction | PDF text parsing + Tesseract OCR for images |
+| Frontend deployment | Vercel |
+| Backend deployment | Render |
+| API version | 2.0.0 |
+
+---
+
+## What the Application Does
+
+1. Accepts soil, climate, location, farm and budget inputs.
+2. Can extract common soil values from a PDF/JPG/PNG soil report.
+3. Uses a trained Random Forest model to rank crop candidates.
+4. Combines ML fit with market and profitability scoring.
+5. Uses Open-Meteo for Indian location search/weather and falls back to MET Norway if the forecast provider is rate-limited or unavailable.
+6. Uses static market baselines by default and can use the data.gov.in / AGMARKNET feed when a backend API key is configured.
+7. Returns five crop recommendations with fit, market score, profit index, estimated revenue/ROI and supporting crop information.
+
+---
+
+## Architecture
+
+```text
+React / Vite frontend
+        |
+        v
+FastAPI backend
+   |        |         |          |
+   |        |         |          +--> Soil report parser (pdfplumber / Tesseract)
+   |        |         +-------------> Open-Meteo weather + geocoding
+   |        +-----------------------> Market baselines + optional AGMARKNET live price
+   +--------------------------------> Random Forest crop classifier
 ```
-farmsense-ai/
+
+---
+
+## Repository Structure
+
+```text
+farmsense/
 ├── backend/
-│   ├── main.py           # FastAPI app (POST /predict, GET /weather)
-│   ├── model.py          # ML model: train / save / load / predict
-│   ├── market_data.py    # Static market scores for 22 crops
+│   ├── data/
+│   │   ├── crop_data.csv
+│   │   ├── mandi_price_history_2016_2026.csv
+│   │   └── mandi_price_history_summary.json
+│   ├── main.py
+│   ├── model.py
+│   ├── market_data.py
+│   ├── ocr_parser.py
+│   ├── generate_dataset.py
+│   ├── build_mandi_price_archive.py
 │   ├── requirements.txt
-│   └── data/
-│       └── crop_data.csv     ← You must place the dataset here
+│   ├── requirements-lock.txt  # tested handoff snapshot
+│   └── .env.example
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx
-│   │   ├── api.js
-│   │   ├── index.css
-│   │   └── components/
-│   │       ├── InputForm.jsx
-│   │       ├── UploadReport.jsx
-│   │       ├── ResultsPanel.jsx
-│   │       ├── CropCard.jsx
-│   │       └── GaugeChart.jsx
-│   ├── index.html
 │   ├── package.json
-│   └── vite.config.js
-├── README.md
-└── run.sh
+│   ├── vite.config.js
+│   ├── vercel.json
+│   └── .env.example
+├── docs/
+│   └── RESEARCH_HANDOFF.md
+├── HANDOFF.md
+├── FarmSense_AI_Updated_Technical_Details.docx  # May 2026 report snapshot
+├── MANDI_DATA.md
+├── VERCEL_DEPLOYMENT.md
+├── render.yaml
+├── run.sh
+└── README.md
 ```
 
 ---
 
-## 🚀 Setup Instructions
+## Local Setup
 
-### 1. Dataset (Required)
+### Prerequisites
 
-Download the **Crop Recommendation Dataset** from Kaggle:
-> https://www.kaggle.com/datasets/atharvaingle/crop-recommendation-dataset
+- Python **3.11** recommended
+- Node.js **18+**
+- npm
+- Git
+- Optional: Tesseract OCR installed on the system for image-based soil reports
 
-Rename the file to `crop_data.csv` and place it at:
+### 1. Clone
+
+```bash
+git clone https://github.com/rSlashGIT/farmsense.git
+cd farmsense
 ```
-backend/data/crop_data.csv
+
+### 2. Backend
+
+#### Windows PowerShell
+
+```powershell
+cd backend
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
+uvicorn main:app --reload --port 8001
 ```
 
-The CSV must have these columns:
-```
-N, P, K, temperature, humidity, ph, rainfall, label
-```
-
----
-
-### 2. Backend (Python + FastAPI)
+#### macOS / Linux
 
 ```bash
 cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+cp .env.example .env
+uvicorn main:app --reload --port 8001
 ```
 
-On first run, the model will train automatically (~10 seconds) and save `model.pkl`.  
-Subsequent runs load the pre-trained model instantly.
+Backend:
+- API: `http://localhost:8001`
+- Swagger: `http://localhost:8001/docs`
+- Health: `http://localhost:8001/health`
 
----
+The dataset is already committed. If model artifacts are absent, the backend trains automatically on startup.
 
-### 3. Frontend (React + Vite + Tailwind)
+For an exact snapshot of the Python package versions verified during the September 2026 handoff, use `backend/requirements-lock.txt`. The normal deployment continues to use `requirements.txt`.
+
+### 3. Frontend
+
+Open a second terminal:
 
 ```bash
 cd frontend
-npm install
+npm ci
+```
+
+Create `frontend/.env` from `.env.example`, then run:
+
+```bash
 npm run dev
 ```
 
-Open your browser at **http://localhost:5173**
+Open `http://localhost:5173`.
+
+Default local API setting:
+
+```text
+VITE_API_BASE_URL=http://localhost:8001
+```
 
 ---
 
-### 4. Quick Start (Both at once — Linux/macOS)
+## Backend Environment Variables
+
+```text
+DATA_GOV_API_KEY=your_data_gov_api_key_here
+MANDI_CACHE_TTL_SECONDS=21600
+MANDI_API_TIMEOUT_SECONDS=6
+MET_NORWAY_USER_AGENT=FarmSense-AI/2.0 https://github.com/rSlashGIT/farmsense
+```
+
+`DATA_GOV_API_KEY` is optional for local operation. Without it, the project still works with static market data and the local mandi archive.
+
+Never commit a real API key.
+
+---
+
+## Main API Endpoints
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/health` | Backend/model/data health |
+| POST | `/predict` | Top-5 crop recommendations |
+| POST | `/upload-report` | Extract soil values from PDF/JPG/PNG |
+| GET | `/locations?query=...` | Indian location suggestions |
+| GET | `/weather?location=...` | Weather auto-fill values |
+| GET | `/market-prices` | Market reference data |
+| GET | `/market-history` | Local mandi archive |
+
+Interactive schemas are available at `/docs`.
+
+---
+
+## Scoring
+
+```text
+overall_score =
+    (fit_score × 0.45)
+  + (market_score × 0.35)
+  + (profit_index × 0.20)
+```
+
+**Important:** `fit_score` is not the raw Random Forest probability. Read [docs/RESEARCH_HANDOFF.md](./docs/RESEARCH_HANDOFF.md) before using these values in academic work.
+
+---
+
+## Dataset and Reproducibility
+
+`backend/data/crop_data.csv` currently contains:
+
+- 5,600 rows
+- 56 crop classes
+- 100 rows per crop
+- columns: `N, P, K, temperature, humidity, ph, rainfall, label`
+
+Regenerate deterministically with:
 
 ```bash
-chmod +x run.sh
-./run.sh
+cd backend
+python generate_dataset.py
 ```
 
-> **Windows users:** Run the backend and frontend commands in two separate terminals.
+The generator uses `numpy.random.seed(42)`.
 
 ---
 
-## 🧠 How the Scoring Works
+## Deployment
 
-Each recommended crop is scored using a weighted formula:
+Current hosted endpoints:
 
+- Frontend: https://farmsense-ai-nine.vercel.app
+- Backend: https://farmsense-ai-backend-dhoy.onrender.com
+- Backend health: https://farmsense-ai-backend-dhoy.onrender.com/health
+
+Configuration:
+- Frontend: [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md)
+- Backend: [render.yaml](./render.yaml)
+- Mandi data: [MANDI_DATA.md](./MANDI_DATA.md)
+
+For a new Vercel deployment:
+
+```text
+VITE_API_BASE_URL=https://<your-render-backend>
 ```
-overall_score = (fit_score × 0.45) + (market_score × 0.35) + (profit_index × 0.20)
-```
 
-| Score         | Source                                           |
-|---------------|--------------------------------------------------|
-| `fit_score`   | ML model confidence × 100                       |
-| `market_score`| Weighted avg: MSP (40%) + demand (40%) + export (20%) |
-| `profit_index`| Blend of fit_score and market_score              |
+Keep `DATA_GOV_API_KEY` only on the backend.
 
 ---
 
-## 🌤 Weather Auto-Fill
+## Legacy Technical Document
 
-Click **"🌤 Auto-fill"** after entering your city name. This calls:
-1. Open-Meteo Geocoding API → converts city name to lat/lon
-2. Open-Meteo Forecast API → fetches current temperature, humidity, and estimates annual rainfall
-
-No API key required. Works for any city worldwide.
+`FarmSense_AI_Updated_Technical_Details.docx` is a **May 18, 2026 report snapshot**. It contains some planned/report-oriented wording (including a React Native iOS direction) that is not the current web implementation. For current behavior, treat the source code, this README, `HANDOFF.md`, and `docs/RESEARCH_HANDOFF.md` as authoritative.
 
 ---
 
-## 📸 Screenshots
+## Student Continuation Checklist
 
-> *(Add screenshots here after running the app)*
-
-| Input Screen | Results Screen |
-|---|---|
-| `[screenshot_input.png]` | `[screenshot_results.png]` |
-
----
-
-## 🛠 Tech Stack
-
-| Layer     | Technology                        |
-|-----------|-----------------------------------|
-| Frontend  | React 18, Vite 5, Tailwind CSS 3  |
-| Backend   | Python 3.10+, FastAPI, Uvicorn    |
-| ML Model  | scikit-learn RandomForestClassifier |
-| Weather   | Open-Meteo API (free, no key)     |
-| Fonts     | Google Fonts: Syne + Space Mono   |
+1. Read [HANDOFF.md](./HANDOFF.md).
+2. Verify `/health`.
+3. Confirm the frontend says **System Online**.
+4. Test one prediction.
+5. Test weather auto-fill.
+6. Test `/market-history`.
+7. Read [docs/RESEARCH_HANDOFF.md](./docs/RESEARCH_HANDOFF.md) before writing a paper, report or methodology section.
 
 ---
 
-## 📋 Crops Supported (22)
+## Important Limitation
 
-rice, wheat, maize, chickpea, kidneybeans, pigeonpeas, mothbeans, mungbean, blackgram, lentil, pomegranate, banana, mango, grapes, watermelon, muskmelon, apple, orange, papaya, coconut, cotton, jute, coffee
-
----
-
-## ⚠️ Disclaimer
-
-Recommendations are for educational and advisory purposes. Always consult a certified agronomist and check local mandi prices before making crop decisions.
-
----
-
-*FarmSense AI — Built for Indian Agriculture*
+FarmSense is an academic decision-support project. Crop suitability, weather-derived rainfall, mandi prices, yield, revenue and ROI values should be independently validated before real-world farming decisions or publication-quality claims.

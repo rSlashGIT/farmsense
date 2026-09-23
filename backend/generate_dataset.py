@@ -1,7 +1,7 @@
 """
 generate_dataset.py — FarmSense AI
-Generates a realistic synthetic Crop Recommendation Dataset (2200 rows, 22 crops)
-that matches the exact distribution of the real Kaggle dataset.
+Generates a deterministic synthetic Crop Recommendation Dataset (5,600 rows, 56 crops)
+from the crop parameter distributions configured in this project.
 Run this if you don't have crop_data.csv:
   python generate_dataset.py
 """
@@ -12,10 +12,10 @@ from pathlib import Path
 
 np.random.seed(42)
 
-# Crop optimal parameter ranges (mean, std) for N, P, K, temp, humidity, ph, rainfall
-# Derived from published agronomic literature, matching Kaggle dataset statistics.
+# Project-configured crop parameter ranges (mean, std) for N, P, K, temp, humidity, pH, rainfall.
+# Validate or replace these ranges before making publication-grade agronomic provenance claims.
 CROP_PARAMS = {
-    # Original 23 crops
+    # Base crop set
     "rice":        dict(N=(80,10),  P=(45,10),  K=(42,10),  temp=(23,2),  hum=(82,5),  ph=(6.5,0.3), rain=(202,30)),
     "wheat":       dict(N=(100,10), P=(46,10),  K=(42,10),  temp=(22,3),  hum=(65,8),  ph=(6.8,0.3), rain=(84,15)),
     "maize":       dict(N=(100,10), P=(60,10),  K=(60,10),  temp=(22,3),  hum=(65,10), ph=(6.2,0.4), rain=(85,15)),
@@ -40,7 +40,7 @@ CROP_PARAMS = {
     "jute":        dict(N=(78,10),  P=(46,8),   K=(39,8),   temp=(25,3),  hum=(79,5),  ph=(6.7,0.3), rain=(175,25)),
     "coffee":      dict(N=(101,10), P=(28,6),   K=(29,6),   temp=(25,3),  hum=(58,8),  ph=(6.7,0.3), rain=(158,25)),
     
-    # 32 New Crops (Vegetables, Spices, Cash Crops, Tubers, etc) -> 55 Total
+    # Extended crop set (vegetables, spices, cash crops, tubers, etc.)
     "tomato":      dict(N=(45,10),  P=(40,8),   K=(50,8),   temp=(25,3),  hum=(70,8),  ph=(6.5,0.3), rain=(60,15)),
     "potato":      dict(N=(70,12),  P=(50,8),   K=(80,15),  temp=(18,3),  hum=(65,8),  ph=(5.5,0.3), rain=(50,15)),
     "onion":       dict(N=(60,10),  P=(45,10),  K=(50,10),  temp=(22,3),  hum=(68,8),  ph=(6.5,0.3), rain=(55,15)),
@@ -77,7 +77,7 @@ CROP_PARAMS = {
 
 }
 
-SAMPLES_PER_CROP = 100  # 22 × 100 = 2200 total
+SAMPLES_PER_CROP = 100  # 56 × 100 = 5,600 total
 
 rows = []
 for crop, params in CROP_PARAMS.items():

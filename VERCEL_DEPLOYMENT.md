@@ -1,66 +1,108 @@
-# FarmSense AI Vercel Deployment
+# FarmSense AI Deployment Guide
 
-## What Vercel will host
+FarmSense uses separate deployments:
 
-Vercel is best used here for the React/Vite frontend in `frontend/`.
+- **Frontend:** Vercel
+- **Backend:** Render
 
-The Python FastAPI backend should have a public URL before the deployed website can use prediction, weather, market, and OCR features. Do not use `http://localhost:8001` in Vercel because localhost means the visitor's own computer, not your backend.
+Source repository: `rSlashGIT/farmsense`.
 
-## Vercel settings
+Current production endpoints:
 
-When importing the project in Vercel:
+- Frontend: https://farmsense-ai-nine.vercel.app
+- Backend: https://farmsense-ai-backend-dhoy.onrender.com
+- Health endpoint: https://farmsense-ai-backend-dhoy.onrender.com/health
+
+## Frontend — Vercel
+
+Use:
 
 | Setting | Value |
 |---|---|
-| Framework Preset | Vite |
+| Framework | Vite |
 | Root Directory | `frontend` |
-| Install Command | `npm install` |
+| Install Command | `npm install` or `npm ci` |
 | Build Command | `npm run build` |
 | Output Directory | `dist` |
 
-## Environment variable
-
-Add this in Vercel Project Settings -> Environment Variables:
+Set:
 
 ```text
-VITE_API_BASE_URL=https://your-backend-url
+VITE_API_BASE_URL=https://<your-render-backend-domain>
 ```
 
-Replace `https://your-backend-url` with the deployed FastAPI backend URL.
+Never point a deployed frontend to `localhost`.
 
-For local development, the frontend still defaults to:
+## Backend — Render
+
+The repository includes `render.yaml` with:
 
 ```text
-http://localhost:8001
+name: farmsense-ai-backend
+runtime: python
+rootDir: backend
+buildCommand: pip install -r requirements.txt
+startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+healthCheckPath: /health
 ```
 
-## Deployment steps
-
-1. Push the project to GitHub.
-2. Go to Vercel and choose Add New -> Project.
-3. Import the GitHub repository.
-4. Set Root Directory to `frontend`.
-5. Confirm the Vite settings shown above.
-6. Add `VITE_API_BASE_URL` if the backend is hosted publicly.
-7. Click Deploy.
-
-## Backend note
-
-The current backend uses FastAPI, scikit-learn model files, OCR libraries, and Python dependencies. It is better hosted as a separate backend service and then connected to the Vercel frontend through `VITE_API_BASE_URL`.
-
-## Live mandi price note
-
-The React frontend does not need the data.gov.in key. Add this only to the Render/FastAPI backend service:
+Platform Python version:
 
 ```text
-DATA_GOV_API_KEY=your_data_gov_api_key
+3.11.11
 ```
 
-After the backend redeploys, `/health` should show:
+Optional live-mandi configuration:
+
+```text
+DATA_GOV_API_KEY=<your data.gov.in key>
+```
+
+## Health verification
+
+After backend deployment:
+
+```text
+https://<backend-domain>/health
+```
+
+Expected shape:
 
 ```json
 {
-  "live_mandi_prices": true,
+  "status": "ok",
+  "model_accuracy": 0,
+  "version": "2.0.0",
+  "total_crops": 56,
+  "live_mandi_prices": false,
   "mandi_archive_available": true
 }
 ```
+
+The actual model accuracy is returned at runtime.
+
+Then verify:
+
+```text
+https://<backend-domain>/docs
+https://<backend-domain>/market-history?crop=tomato&limit=5
+https://<backend-domain>/weather?location=Bengaluru
+```
+
+## Connect frontend to backend
+
+1. Set Vercel `VITE_API_BASE_URL` to the Render base URL.
+2. Redeploy the frontend.
+3. Load the app.
+4. Confirm **System Online**.
+5. Run one prediction.
+
+## Secrets
+
+Keep all API keys on the backend.
+
+Never put `DATA_GOV_API_KEY` in a `VITE_...` variable because Vite variables are exposed to client-side JavaScript.
+
+## Free-tier note
+
+Render free services can sleep when idle, so the first request can be slower after inactivity.

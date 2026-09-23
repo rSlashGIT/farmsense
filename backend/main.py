@@ -46,6 +46,11 @@ DATA_GOV_API_URL = "https://api.data.gov.in/resource/current-daily-price-various
 DATA_GOV_API_KEY = os.getenv("DATA_GOV_API_KEY") or os.getenv("AGMARKNET_API_KEY")
 MANDI_CACHE_TTL_SECONDS = int(os.getenv("MANDI_CACHE_TTL_SECONDS", "21600"))
 MANDI_API_TIMEOUT_SECONDS = float(os.getenv("MANDI_API_TIMEOUT_SECONDS", "6"))
+MET_NORWAY_API_URL = "https://api.met.no/weatherapi/locationforecast/2.0/compact"
+MET_NORWAY_USER_AGENT = os.getenv(
+    "MET_NORWAY_USER_AGENT",
+    "FarmSense-AI/2.0 https://github.com/rSlashGIT/farmsense",
+)
 BASE_DIR = Path(__file__).parent
 MANDI_ARCHIVE_PATH = BASE_DIR / "data" / "mandi_price_history_2016_2026.csv"
 MANDI_ARCHIVE_SUMMARY_PATH = BASE_DIR / "data" / "mandi_price_history_summary.json"
@@ -806,12 +811,50 @@ async def get_location_suggestions(query: str = Query(..., min_length=2, descrip
     }
 
 
+def _fetch_met_norway_weather(lat: float, lon: float) -> tuple[float, float, float]:
+    """Fallback weather source for hosts rate-limited by Open-Meteo."""
+    response = requests.get(
+        MET_NORWAY_API_URL,
+        params={"lat": round(lat, 4), "lon": round(lon, 4)},
+        headers={"User-Agent": MET_NORWAY_USER_AGENT},
+        timeout=10,
+    )
+    response.raise_for_status()
+    timeseries = response.json().get("properties", {}).get("timeseries", [])
+    if not timeseries:
+        raise requests.RequestException("MET Norway returned no forecast timeseries")
+
+    current = timeseries[0].get("data", {}).get("instant", {}).get("details", {})
+    temperature = float(current.get("air_temperature", 25.0))
+    humidity = float(current.get("relative_humidity", 60.0))
+
+    hourly_precip = []
+    for point in timeseries:
+        value = (
+            point.get("data", {})
+            .get("next_1_hours", {})
+            .get("details", {})
+            .get("precipitation_amount")
+        )
+        if value is not None:
+            hourly_precip.append(float(value))
+
+    if hourly_precip:
+        avg_hourly_mm = sum(hourly_precip) / len(hourly_precip)
+        annual_rainfall_est = round(avg_hourly_mm * 24 * 365 / 10, 1)
+    else:
+        annual_rainfall_est = 80.0
+
+    annual_rainfall_est = max(20.0, min(300.0, annual_rainfall_est))
+    return temperature, humidity, annual_rainfall_est
+
+
 # ─── /weather endpoint ────────────────────────────────────────────────────────
 
 @app.get("/weather")
 async def get_weather(location: str = Query(..., description="City or district name")):
     """
-    Fetches real-time weather from Open-Meteo (no API key required).
+    Fetches real-time weather from Open-Meteo with a MET Norway fallback.
     Returns values ready to auto-fill the frontend climate inputs.
     """
     try:
@@ -839,27 +882,36 @@ async def get_weather(location: str = Query(..., description="City or district n
         "forecast_days": 7,
     }
 
+    source = "Open-Meteo (open-meteo.com)"
     try:
         w_resp = requests.get(weather_url, params=weather_params, timeout=10)
         w_resp.raise_for_status()
         w_data = w_resp.json()
-    except requests.RequestException as e:
-        raise HTTPException(status_code=502, detail=f"Weather request failed: {e}")
 
-    current = w_data.get("current", {})
-    daily = w_data.get("daily", {})
+        current = w_data.get("current", {})
+        daily = w_data.get("daily", {})
+        temperature = current.get("temperature_2m", 25.0)
+        humidity = current.get("relative_humidity_2m", 60.0)
 
-    temperature = current.get("temperature_2m", 25.0)
-    humidity = current.get("relative_humidity_2m", 60.0)
-
-    daily_precip = daily.get("precipitation_sum", [])
-    if daily_precip:
-        weekly_avg = sum(daily_precip) / len(daily_precip) * 7
-        annual_rainfall_est = round(weekly_avg * 52 / 10, 1)
-    else:
-        annual_rainfall_est = 80.0
-
-    annual_rainfall_est = max(20.0, min(300.0, annual_rainfall_est))
+        daily_precip = daily.get("precipitation_sum", [])
+        if daily_precip:
+            weekly_avg = sum(daily_precip) / len(daily_precip) * 7
+            annual_rainfall_est = round(weekly_avg * 52 / 10, 1)
+        else:
+            annual_rainfall_est = 80.0
+        annual_rainfall_est = max(20.0, min(300.0, annual_rainfall_est))
+    except (requests.RequestException, ValueError, TypeError) as open_meteo_error:
+        try:
+            temperature, humidity, annual_rainfall_est = _fetch_met_norway_weather(lat, lon)
+            source = "MET Norway fallback (api.met.no)"
+        except (requests.RequestException, ValueError, TypeError) as fallback_error:
+            raise HTTPException(
+                status_code=502,
+                detail=(
+                    f"Weather providers unavailable. Open-Meteo: {open_meteo_error}; "
+                    f"MET Norway: {fallback_error}"
+                ),
+            )
 
     return {
         "location": resolved_location,
@@ -868,7 +920,7 @@ async def get_weather(location: str = Query(..., description="City or district n
         "temperature": round(temperature, 1),
         "humidity": round(humidity, 1),
         "rainfall": annual_rainfall_est,
-        "source": "Open-Meteo (open-meteo.com)",
+        "source": source,
     }
 
 
