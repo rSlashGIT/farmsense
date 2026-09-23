@@ -81,12 +81,14 @@ farmsense/
 │   ├── vercel.json
 │   └── .env.example
 ├── docs/
-│   └── RESEARCH_HANDOFF.md
+│   ├── RESEARCH_HANDOFF.md
+│   └── VALIDATION.md
 ├── HANDOFF.md
 ├── FarmSense_AI_Updated_Technical_Details.docx  # May 2026 report snapshot
 ├── MANDI_DATA.md
 ├── VERCEL_DEPLOYMENT.md
 ├── render.yaml
+├── run.ps1
 ├── run.sh
 └── README.md
 ```
@@ -110,13 +112,24 @@ git clone https://github.com/rSlashGIT/farmsense.git
 cd farmsense
 ```
 
+### Windows quick start
+
+From the repository root:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\run.ps1
+```
+
+This prepares missing local dependencies and launches the backend and frontend in separate terminals. On later runs, `./run.ps1 -SkipInstall` skips dependency installation.
+
 ### 2. Backend
 
 #### Windows PowerShell
 
 ```powershell
 cd backend
-py -3.11 -m venv .venv
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 Copy-Item .env.example .env
@@ -244,6 +257,7 @@ Configuration:
 - Frontend: [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md)
 - Backend: [render.yaml](./render.yaml)
 - Mandi data: [MANDI_DATA.md](./MANDI_DATA.md)
+- Latest verification record: [docs/VALIDATION.md](./docs/VALIDATION.md)
 
 For a new Vercel deployment:
 

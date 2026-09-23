@@ -21,13 +21,14 @@ You do **not** need to rebuild the project from scratch.
 ## First 15 minutes
 
 1. Clone the repository.
-2. Follow the Local Setup section in `README.md`.
-3. Start the backend on port `8001`.
+2. On Windows, run `./run.ps1` from the repository root for the fastest setup; otherwise follow the Local Setup section in `README.md`.
+3. Start/confirm the backend on port `8001`.
 4. Open `http://localhost:8001/health`.
 5. Open `http://localhost:8001/docs`.
-6. Start the frontend on port `5173`.
+6. Start/confirm the frontend on port `5173`.
 7. Confirm the frontend shows **System Online**.
 8. Run one crop recommendation.
+9. Check `docs/VALIDATION.md` for the latest verified production/build state.
 
 A healthy backend response should include `"status": "ok"`, model accuracy, `"total_crops": 56`, and mandi archive availability.
 
